@@ -1,30 +1,33 @@
-const getline = @import("readline.zig").getline;
+const std = @import("std");
 
-const Allocator = @import("std").heap.c_allocator;
-const stdout_file = @import("std").io.getStdOut();
 
-fn READ(a: []const u8) []const u8 {
-    return a;
+
+pub fn READ(read_buffer: []u8) ![]const u8 {
+    const in = std.io.getStdIn();
+
+    _ = PRINT("\nuser> ") catch @panic("Hell let lose");
+    return try in.reader().readUntilDelimiter(read_buffer, '\n');
 }
 
-fn EVAL(a: []const u8) []const u8 {
-    return a;
+pub fn EVAL(str: []const u8) []const u8 {
+    return str;
 }
 
-fn PRINT(a: []const u8) !void {
-    try stdout_file.writeAll(a);
-    try stdout_file.writeAll("\n");
+pub fn PRINT(str: []const u8) ![]const u8 {
+    const out = std.io.getStdOut();
+    try out.writeAll(str);
+    return str;
 }
 
-fn rep(input: []const u8) !void {
-    const read_input = READ(input);
-    const eval_input = EVAL(read_input);
-    try PRINT(eval_input);
+pub fn rep() !void {
+    const read_buffer_size = 1024;
+
+    var read_buffer: [read_buffer_size]u8 = [_]u8{0} ** read_buffer_size;
+    _ = try PRINT(EVAL(try READ(&read_buffer)));
 }
 
 pub fn main() !void {
-    while(try getline("user> ")) |line| {
-        defer Allocator.free(line);
-        try rep(line);
+    while (true) {
+        try rep();
     }
 }
