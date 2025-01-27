@@ -16,7 +16,6 @@ pub fn build(b: *Builder) void {
     });
 
     exe.linkLibC();
-    exe.linkSystemLibrary("pcre");
     exe.linkSystemLibrary("readline");
     b.default_step.dependOn(&exe.step);
     b.installArtifact(exe);

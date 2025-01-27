@@ -3,7 +3,9 @@ const Allocator = std.mem.Allocator;
 
 const Value = @import("types.zig").Value;
 const Number = @import("types.zig").Number;
+const Vector = @import("types.zig").Vector;
 const List = @import("types.zig").List;
+const HashMap = @import("types.zig").HashMap;
 
 pub const ReaderError = error{UnexpectedEof} || Allocator.Error || std.fmt.ParseIntError;
 
@@ -20,6 +22,9 @@ fn readForm(allocator: Allocator, r: *Reader) ReaderError!?*Value {
 
     return switch (token[0]) {
         '(' => try readList(allocator, r),
+        '[' => try readVector(allocator, r),
+        '{' => try readHashMap(allocator, r),
+        '\'', '`', '~', '@' => try readSyntacticSugar(allocator, r),
         else => try readAtom(allocator, r),
     };
 }
@@ -30,16 +35,75 @@ fn readList(allocator: Allocator, r: *Reader) ReaderError!?*Value {
 
     _ = r.next(); // eat (
 
-    std.debug.print("readList\n", .{});
+    while (r.peek()) |token| {
+        if (token[0] == ')') {
+            _ = r.next(); // eat )
+            return result;
+        }
 
-    var token = r.peek();
-    while (token != null and token.?[0] != ')') {
         try result.list.append(
-            try readForm(allocator, r) orelse return null, // is this stupid???
+            try readForm(allocator, r) orelse @panic("fix me"), // is this stupid???
         );
-        token = r.peek();
     }
-    _ = r.next(); // eat )
+
+    return error.UnexpectedEof;
+}
+
+fn readVector(allocator: Allocator, r: *Reader) ReaderError!?*Value {
+    var result = try allocator.create(Value);
+    result.* = Value{ .vector = Vector.init(allocator) };
+
+    _ = r.next(); // eat [
+
+    while (r.peek()) |token| {
+        if (token[0] == ']') {
+            _ = r.next(); // eat ]
+            return result;
+        }
+
+        try result.vector.append(
+            try readForm(allocator, r) orelse @panic("fix me"), // is this stupid???
+        );
+    }
+
+    return error.UnexpectedEof;
+}
+
+fn readHashMap(allocator: Allocator, r: *Reader) ReaderError!?*Value {
+    var result = try allocator.create(Value);
+    result.* = Value{ .hash_map = HashMap.init(allocator) };
+
+    _ = r.next(); // eat {
+
+    while (r.peek()) |token| {
+        if (token[0] == '}') {
+            _ = r.next(); // eat }
+            return result;
+        }
+
+        try result.hash_map.put(try readForm(allocator, r) orelse @panic("fix me"), try readForm(allocator, r) orelse @panic("fix me"));
+    }
+
+    return error.UnexpectedEof;
+}
+
+fn readSyntacticSugar(allocator: Allocator, r: *Reader) ReaderError!?*Value {
+    const sugar = r.next().?;
+
+    const result = try allocator.create(Value);
+    result.* = Value{ .list = List.init(allocator) };
+
+    const first_val = try allocator.create(Value);
+    first_val.* = Value{ .symbol = try allocator.dupe(u8, switch (sugar[0]) {
+        '\'' => "quote",
+        '`' => "quasiquote",
+        '~' => if (sugar.len == 1) "unquote" else "splice-unquote",
+        '@' => "deref",
+        else => @panic("fix me"),
+    }) };
+    try result.list.append(first_val);
+
+    try result.list.append(try readForm(allocator, r) orelse @panic("fix me"));
 
     return result;
 }
@@ -48,8 +112,6 @@ fn readAtom(allocator: Allocator, r: *Reader) ReaderError!?*Value {
     const token = r.next() orelse return null;
 
     const result = try allocator.create(Value);
-
-    std.debug.print("atom\n", .{});
 
     if (std.ascii.isDigit(token[0])) {
         const number = try std.fmt.parseInt(Number, token, 10);
@@ -125,7 +187,7 @@ pub const Tokenizer = struct {
                         switch (d) {
                             '"' => return t.input[start .. t.index + 1],
                             '\\' => {
-                                t.index += 2;
+                                t.index += 1;
                             },
                             else => {},
                         }
@@ -139,7 +201,7 @@ pub const Tokenizer = struct {
                         if (d == '\n')
                             break;
                     }
-                    return t.input[start .. t.index + 1];
+                    return t.input[start..t.index];
                 },
                 else => {
                     const start = t.index;
@@ -155,7 +217,6 @@ pub const Tokenizer = struct {
                 },
             }
         }
-
         return null;
     }
 };
