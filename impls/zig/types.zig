@@ -1,11 +1,13 @@
 const std = @import("std");
 
 pub const Value = union(enum) {
+    number: Number,
     list: List,
     vector: Vector,
+    native_func: NativeFunc,
     hash_map: HashMap,
-    number: Number,
     symbol: []const u8,
+    nil: Nil,
 
     pub fn format(
         value: *Value,
@@ -32,6 +34,9 @@ pub const Value = union(enum) {
                 }
                 _ = try writer.writeAll("]");
             },
+            .native_func => |f| {
+                try writer.print("{p}", .{f});
+            },
             .hash_map => |h| {
                 _ = try writer.writeAll("{");
                 var i = h.iterator();
@@ -52,20 +57,24 @@ pub const Value = union(enum) {
             .symbol => |s| {
                 try writer.print("{s}", .{s});
             },
+            .nil => {
+                try writer.print("nil", .{});
+            },
         }
     }
 };
 
+pub const Nil = void;
 pub const Number = i64;
 pub const List = Vector; // Maybe use std.SinglyLinkedList(*Value)?
 pub const Vector = std.ArrayList(*Value);
+pub const NativeFunc = *const fn (std.mem.Allocator, []*Value) *Value;
 pub const HashMap = std.HashMap(
     *Value,
     *Value,
     ValueHashMapContext,
     std.hash_map.default_max_load_percentage,
 );
-
 const ValueHashMapContext = struct {
     pub fn hash(self: @This(), v: *Value) u64 {
         _ = self;

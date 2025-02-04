@@ -113,7 +113,7 @@ fn readAtom(allocator: Allocator, r: *Reader) ReaderError!?*Value {
 
     const result = try allocator.create(Value);
 
-    if (std.ascii.isDigit(token[0])) {
+    if (std.ascii.isDigit(token[0]) or (token[0] == '-' or token[0] == '+') and token.len > 1) {
         const number = try std.fmt.parseInt(Number, token, 10);
         result.* = Value{ .number = number };
     } else {
@@ -123,6 +123,7 @@ fn readAtom(allocator: Allocator, r: *Reader) ReaderError!?*Value {
     return result;
 }
 
+const debug_tokens = false;
 pub fn tokenize(allocator: Allocator, input: []const u8) ReaderError![]const []const u8 {
     var buffer = std.ArrayList([]const u8).init(allocator);
 
@@ -131,6 +132,9 @@ pub fn tokenize(allocator: Allocator, input: []const u8) ReaderError![]const []c
     };
 
     while (try tokenizer.next()) |token| {
+        if (debug_tokens) {
+            std.debug.print("{s}\n", .{token});
+        }
         try buffer.append(token);
     }
 
